@@ -227,11 +227,19 @@ export default function LogPage() {
       ...prev,
       {
         extractedName: "",
-        createNew: false,
-        selectedOption: allPeople.length > 0 ? String(allPeople[0].id) : "new",
-        personId: allPeople.length > 0 ? allPeople[0].id : undefined,
+        createNew: true,
+        selectedOption: "new",
+        personId: undefined,
       },
     ]);
+  }
+
+  function updateExtractedName(index: number, name: string) {
+    setAssignments((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], extractedName: name };
+      return next;
+    });
   }
 
   function removeTopic(topic: string) {
@@ -249,6 +257,11 @@ export default function LogPage() {
   async function confirmMeeting() {
     if (assignments.length === 0) {
       toast.error("Add at least one person");
+      return;
+    }
+    const emptyNew = assignments.some((a) => a.createNew && !a.extractedName.trim());
+    if (emptyNew) {
+      toast.error("Please enter a name for all new people");
       return;
     }
     setConfirming(true);
@@ -451,7 +464,7 @@ export default function LogPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="new">
-                          ✨ Create new: {assignment.extractedName || "New Person"}
+                          ✨ Create new person
                         </SelectItem>
                         {/* Show candidates first if available */}
                         {preview.matches[index]?.candidates?.map((c) => (
@@ -472,6 +485,15 @@ export default function LogPage() {
                           ))}
                       </SelectContent>
                     </Select>
+                    {assignment.selectedOption === "new" && (
+                      <Input
+                        placeholder="Enter person's name..."
+                        value={assignment.extractedName}
+                        onChange={(e) => updateExtractedName(index, e.target.value)}
+                        className="mt-1.5"
+                        autoFocus
+                      />
+                    )}
                   </div>
                   <Button
                     variant="ghost"
