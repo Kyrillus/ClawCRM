@@ -91,11 +91,12 @@ async function seed() {
   // Disable foreign keys temporarily to allow clean deletion
   sqlite.exec("PRAGMA foreign_keys = OFF");
   sqlite.exec("DELETE FROM settings");
+  sqlite.exec("DELETE FROM meeting_people");
   sqlite.exec("DELETE FROM relationships");
   sqlite.exec("DELETE FROM meetings");
   sqlite.exec("DELETE FROM people");
   // Reset autoincrement counters
-  sqlite.exec("DELETE FROM sqlite_sequence WHERE name IN ('people','meetings','relationships','settings')");
+  sqlite.exec("DELETE FROM sqlite_sequence WHERE name IN ('people','meetings','relationships','settings','meeting_people')");
   sqlite.exec("PRAGMA foreign_keys = ON");
   console.log("🧹 Cleaned existing data");
 
@@ -160,11 +161,34 @@ async function seed() {
     },
   ];
 
+  const meetingIds: number[] = [];
   for (const meeting of seedMeetings) {
-    db.insert(schema.meetings).values(meeting).run();
+    const result = db.insert(schema.meetings).values(meeting).returning().get();
+    meetingIds.push(result.id);
   }
 
   console.log(`✅ Inserted ${seedMeetings.length} meetings`);
+
+  // Insert meeting_people junction records
+  // meeting 0 (Sarah) -> Sarah
+  // meeting 1 (Aisha) -> Aisha, David (she introduced David)
+  // meeting 2 (David) -> David, Aisha (Aisha introduced them)
+  // meeting 3 (Elena) -> Elena
+  // meeting 4 (Marcus) -> Marcus
+  const meetingPeopleData = [
+    { meetingId: meetingIds[0], personId: sarah },
+    { meetingId: meetingIds[1], personId: aisha },
+    { meetingId: meetingIds[1], personId: david },
+    { meetingId: meetingIds[2], personId: david },
+    { meetingId: meetingIds[2], personId: aisha },
+    { meetingId: meetingIds[3], personId: elena },
+    { meetingId: meetingIds[4], personId: marcus },
+  ];
+  for (const mp of meetingPeopleData) {
+    db.insert(schema.meetingPeople).values(mp).run();
+  }
+
+  console.log(`✅ Inserted ${meetingPeopleData.length} meeting-people links`);
 
   // Insert relationships using actual IDs
   const seedRelationships = [

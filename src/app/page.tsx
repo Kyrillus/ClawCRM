@@ -26,6 +26,12 @@ interface Stats {
   totalRelationships: number;
 }
 
+interface MeetingPerson {
+  personId: number;
+  personName: string | null;
+  personCompany: string | null;
+}
+
 interface MeetingItem {
   meeting: {
     id: number;
@@ -35,6 +41,7 @@ interface MeetingItem {
     rawInput: string;
     topics: string[];
   };
+  people: MeetingPerson[];
   personName: string | null;
   personCompany: string | null;
 }
@@ -271,21 +278,25 @@ export default function Dashboard() {
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        {m.personName ? (
-                          <Link
-                            href={`/people/${m.meeting.personId}`}
-                            className="font-medium hover:underline"
-                          >
-                            {m.personName}
-                          </Link>
-                        ) : (
-                          <span className="font-medium">Unknown</span>
-                        )}
-                        {m.personCompany && (
-                          <span className="text-sm text-muted-foreground">
-                            at {m.personCompany}
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        {(m.people && m.people.length > 0 ? m.people : m.personName ? [{ personId: m.meeting.personId, personName: m.personName, personCompany: m.personCompany }] : []).map((p, idx) => (
+                          <span key={p.personId || idx} className="flex items-center gap-1">
+                            {idx > 0 && <span className="text-muted-foreground">&</span>}
+                            <Link
+                              href={`/people/${p.personId}`}
+                              className="font-medium hover:underline"
+                            >
+                              {p.personName}
+                            </Link>
+                            {idx === 0 && p.personCompany && (
+                              <span className="text-sm text-muted-foreground">
+                                at {p.personCompany}
+                              </span>
+                            )}
                           </span>
+                        ))}
+                        {(!m.people || m.people.length === 0) && !m.personName && (
+                          <span className="font-medium">Unknown</span>
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground line-clamp-2">
