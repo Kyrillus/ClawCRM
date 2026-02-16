@@ -5,6 +5,7 @@ export const people = sqliteTable("people", {
   name: text("name").notNull(),
   phone: text("phone"),
   email: text("email"),
+  whatsappId: text("whatsapp_id"),
   socials: text("socials", { mode: "json" }).$type<Record<string, string>>(),
   tags: text("tags", { mode: "json" }).$type<string[]>().default([]),
   context: text("context"),
@@ -23,6 +24,7 @@ export const meetings = sqliteTable("meetings", {
   date: text("date").notNull().$defaultFn(() => new Date().toISOString()),
   rawInput: text("raw_input").notNull(),
   summary: text("summary"),
+  source: text("source").default("manual"),
   topics: text("topics", { mode: "json" }).$type<string[]>().default([]),
   embedding: blob("embedding", { mode: "buffer" }),
   createdAt: text("created_at").notNull().$defaultFn(() => new Date().toISOString()),
@@ -56,6 +58,19 @@ export const meetingPeople = sqliteTable("meeting_people", {
   personId: integer("person_id").notNull().references(() => people.id, { onDelete: "cascade" }),
 });
 
+export const syncLog = sqliteTable("sync_log", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  timestamp: text("timestamp").notNull().$defaultFn(() => new Date().toISOString()),
+  type: text("type").notNull(), // "contacts" | "messages" | "import"
+  contactsSynced: integer("contacts_synced").default(0),
+  messagesSynced: integer("messages_synced").default(0),
+  errors: text("errors"),
+  status: text("status").notNull().default("running"), // "running" | "completed" | "error"
+  details: text("details"),
+});
+
+export type SyncLog = typeof syncLog.$inferSelect;
+export type NewSyncLog = typeof syncLog.$inferInsert;
 export type Setting = typeof settings.$inferSelect;
 export type MeetingPerson = typeof meetingPeople.$inferSelect;
 export type NewMeetingPerson = typeof meetingPeople.$inferInsert;

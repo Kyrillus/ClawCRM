@@ -11,6 +11,7 @@ import {
   Network,
   Settings,
   Zap,
+  MessageSquare,
 } from "lucide-react";
 
 const navItems = [
@@ -18,6 +19,7 @@ const navItems = [
   { href: "/people", label: "People", icon: Users },
   { href: "/log", label: "Log Meeting", icon: MessageSquarePlus },
   { href: "/graph", label: "Graph", icon: Network },
+  { href: "/sync", label: "WhatsApp Sync", icon: MessageSquare },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
