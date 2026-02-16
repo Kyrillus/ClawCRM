@@ -26,6 +26,10 @@ export class FallbackProvider implements LLMProvider, EmbeddingProvider {
     const combined = (systemPrompt || "") + "\n" + prompt;
 
     if (this.isMeetingExtraction(combined)) {
+      // Check if multi-person extraction is requested
+      if (combined.includes("names") && combined.includes("array")) {
+        return this.extractMultiMeetingData(prompt) as T;
+      }
       return this.extractMeetingData(prompt) as T;
     }
 
@@ -56,6 +60,18 @@ export class FallbackProvider implements LLMProvider, EmbeddingProvider {
   }
 
   // --- Meeting extraction ---
+
+  private extractMultiMeetingData(prompt: string): {
+    names: string[];
+    summary: string;
+    topics: string[];
+  } {
+    const names = this.extractAllPersonNames(prompt);
+    const summary = this.extractSummary(prompt);
+    const topics = this.extractTopics(prompt);
+
+    return { names, summary, topics };
+  }
 
   private extractMeetingData(prompt: string): {
     name: string;
@@ -110,6 +126,43 @@ export class FallbackProvider implements LLMProvider, EmbeddingProvider {
     // Return the most frequently mentioned name
     const sorted = Object.entries(names).sort((a, b) => b[1] - a[1]);
     return sorted[0]?.[0] || "Unknown Person";
+  }
+
+  /**
+   * Extract ALL person names from meeting text.
+   */
+  private extractAllPersonNames(text: string): string[] {
+    const patterns = [
+      /(?:with|met|saw|called|emailed|texted|messaged|visited|contacted)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z''-]+){0,3})/g,
+      /([A-Z][a-z]+(?:\s+[A-Z][a-z''-]+){1,3})\s+(?:told|said|mentioned|showed|shared|offered|suggested|introduced|asked|explained)/g,
+      /(?:call|meeting|chat|conversation|discussion|lunch|dinner|coffee|drinks)\s+with\s+([A-Z][a-z]+(?:\s+[A-Z][a-z''-]+){0,3})/g,
+      /([A-Z][a-z]+(?:\s+[A-Z][a-z''-]+){1,3})\s+(?:from|at|of)\s+/g,
+      /(?:^|\.\s+)([A-Z][a-z]+(?:\s+[A-Z][a-z''-]+){1,3})\s+(?:and I|is|was|has)/g,
+    ];
+
+    const names: Record<string, number> = {};
+    const skipWords = new Set([
+      "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+      "January", "February", "March", "April", "May", "June", "July", "August",
+      "September", "October", "November", "December", "Today", "Yesterday",
+      "Tomorrow", "Zoom", "Google", "Microsoft", "Apple", "Amazon", "The",
+      "This", "That", "These", "Those", "Here", "There", "Had", "Got",
+    ]);
+
+    for (const pattern of patterns) {
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        const name = match[1].trim();
+        const firstName = name.split(" ")[0];
+        if (!skipWords.has(firstName) && name.length > 2) {
+          names[name] = (names[name] || 0) + 1;
+        }
+      }
+    }
+
+    const sorted = Object.entries(names).sort((a, b) => b[1] - a[1]);
+    if (sorted.length === 0) return ["Unknown Person"];
+    return sorted.map(([name]) => name);
   }
 
   /**

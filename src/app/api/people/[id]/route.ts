@@ -16,12 +16,37 @@ export async function GET(
     return NextResponse.json({ error: "Person not found" }, { status: 404 });
   }
 
-  const personMeetings = db
+  // Get meetings via junction table
+  const junctionMeetingIds = db
+    .select({ meetingId: schema.meetingPeople.meetingId })
+    .from(schema.meetingPeople)
+    .where(eq(schema.meetingPeople.personId, personId))
+    .all()
+    .map((r) => r.meetingId);
+
+  // Also include legacy personId meetings
+  const legacyMeetings = db
     .select()
     .from(schema.meetings)
     .where(eq(schema.meetings.personId, personId))
-    .orderBy(desc(schema.meetings.date))
     .all();
+
+  const junctionMeetings = junctionMeetingIds.length > 0
+    ? db
+        .select()
+        .from(schema.meetings)
+        .all()
+        .filter((m) => junctionMeetingIds.includes(m.id))
+    : [];
+
+  // Merge and deduplicate
+  const meetingMap = new Map<number, typeof schema.meetings.$inferSelect>();
+  for (const m of [...legacyMeetings, ...junctionMeetings]) {
+    meetingMap.set(m.id, m);
+  }
+  const personMeetings = Array.from(meetingMap.values()).sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
 
   const personRelationships = db
     .select()

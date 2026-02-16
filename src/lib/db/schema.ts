@@ -50,4 +50,12 @@ export type Meeting = typeof meetings.$inferSelect;
 export type NewMeeting = typeof meetings.$inferInsert;
 export type Relationship = typeof relationships.$inferSelect;
 export type NewRelationship = typeof relationships.$inferInsert;
+export const meetingPeople = sqliteTable("meeting_people", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  meetingId: integer("meeting_id").notNull().references(() => meetings.id, { onDelete: "cascade" }),
+  personId: integer("person_id").notNull().references(() => people.id, { onDelete: "cascade" }),
+});
+
 export type Setting = typeof settings.$inferSelect;
+export type MeetingPerson = typeof meetingPeople.$inferSelect;
+export type NewMeetingPerson = typeof meetingPeople.$inferInsert;
