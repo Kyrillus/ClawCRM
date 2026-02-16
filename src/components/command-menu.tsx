@@ -55,7 +55,7 @@ export function CommandMenu() {
     try {
       const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
       const data = await res.json();
-      setResults(Array.isArray(data) ? data : []);
+      setResults(Array.isArray(data) ? data : (data.results || []));
     } catch {
       setResults([]);
     }

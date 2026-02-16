@@ -133,7 +133,28 @@ export async function GET(req: NextRequest) {
     // Sort by score descending
     results.sort((a, b) => b.score - a.score);
 
-    return NextResponse.json(results.slice(0, 20));
+    // Return both flat results and structured format for different consumers
+    const peopleResults = results
+      .filter((r) => r.type === "person")
+      .map((r) => {
+        const person = people.find((p) => p.id === r.id);
+        return {
+          id: r.id,
+          name: r.title,
+          company: person?.company || "",
+          role: person?.role || "",
+          score: r.score,
+          snippet: r.subtitle,
+        };
+      });
+
+    const meetingResults = results.filter((r) => r.type === "meeting");
+
+    return NextResponse.json({
+      results: results.slice(0, 20),
+      people: peopleResults.slice(0, 10),
+      meetings: meetingResults.slice(0, 10),
+    });
   } catch (error) {
     console.error("Search error:", error);
     return NextResponse.json({ error: "Search failed" }, { status: 500 });

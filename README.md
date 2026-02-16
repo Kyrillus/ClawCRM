@@ -1,31 +1,88 @@
-# 🦞 ClawCRM
+# 🐾 ClawCRM
 
-**AI-powered personal CRM for managing relationships and meetings.**
+**AI-Powered Personal People CRM**
 
-ClawCRM helps you keep track of the people you meet, what you discussed, and how they're connected — all powered by AI that works even without API keys.
+ClawCRM is a self-hosted, AI-powered CRM for managing your personal and professional relationships. Log meetings with voice or text, and let AI extract contacts, generate profiles, build relationship graphs, and enable semantic search across your entire network.
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
-![SQLite](https://img.shields.io/badge/SQLite-Local-blue?logo=sqlite)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)
+![SQLite](https://img.shields.io/badge/SQLite-Local-003B57?logo=sqlite)
+![License](https://img.shields.io/badge/License-MIT-green)
 
 ## ✨ Features
 
-- **📝 Meeting Logger** — Type or dictate meeting notes with Web Speech API voice input
-- **🤖 AI Processing** — Automatically extracts person names, topics, and summaries from your notes
-- **👥 Contact Management** — Rich profiles with auto-generated markdown summaries
-- **🔍 Semantic Search** — Search across people and meetings with TF-IDF + embedding-based search
-- **🕸️ Relationship Graph** — Interactive force-directed graph visualizing your network
-- **⌨️ Command Palette** — Quick navigation with `⌘K`
-- **🌙 Dark Mode** — Beautiful dark theme by default
-- **🔒 Self-hosted** — All data stored locally in SQLite, nothing leaves your machine
-- **🔄 Fallback LLM** — Works without any API keys using keyword extraction and TF-IDF
+### 📊 Dashboard
+- Semantic search bar — find people by what you talked about
+- Recent meetings feed with AI-generated summaries
+- Quick stats: contacts, meetings, connections
+- Quick-action buttons for logging meetings
+
+### 👥 People Management
+- Grid/list view with search and tag filters
+- Contact cards with meeting count, last interaction
+- Full CRUD: add, edit, delete contacts
+
+### 📝 Person Profiles
+- **Auto-generated markdown profiles** from meeting notes
+- Editable fields: name, phone, email, company, role, tags, socials
+- Meeting timeline per person
+- Related people (from relationship graph)
+- One-click profile regeneration with AI
+
+### 🎤 Meeting Logger
+- Free-form text input describing your meeting
+- **Browser-native voice input** (Web Speech API)
+- AI extracts: person names, topics, key facts, sentiment
+- Fuzzy-matches people against existing contacts
+- Auto-creates new contacts if not found
+- Generates embeddings for semantic search
+
+### 🔍 Semantic Search
+- Natural language queries: "ML engineers", "people I discussed AI with"
+- Cosine similarity against person & meeting embeddings
+- Falls back to keyword matching when no API key is configured
+- Results ranked by relevance with match scores
+
+### 🕸️ Relationship Graph
+- Interactive force-directed network visualization
+- Nodes = people, edges = relationships from co-mentions
+- Node size based on meeting count
+- Color-coded by tags (engineering, AI, design, etc.)
+- Click to navigate to person profile
+- Fullscreen mode, zoom, pan, drag
+
+### ⚙️ LLM Provider System
+- **Pluggable AI providers**: Google Gemini, OpenAI, Anthropic, Ollama
+- Default: Google Gemini (free tier available)
+- API key management in settings UI
+- Connection testing
+- Fallback to local bag-of-words embeddings when no API key
+
+### 🎨 UI/UX
+- Modern, clean design with shadcn/ui components
+- **Dark mode by default** with light mode toggle
+- Responsive design (mobile + desktop)
+- Command palette (**⌘K**) for quick navigation/search
+- Mobile bottom navigation bar
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 15 (App Router) |
+| Language | TypeScript |
+| UI | shadcn/ui + Tailwind CSS v4 |
+| Database | SQLite via Drizzle ORM |
+| AI | Google Gemini / OpenAI / Anthropic / Ollama |
+| Embeddings | Provider API or local bag-of-words |
+| Voice | Web Speech API (browser-native) |
+| Graph | react-force-graph-2d |
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-
-- Node.js 18+ (or Bun)
-- npm, yarn, or pnpm
+- Node.js 18+ (recommended: 20+)
+- npm
 
 ### Installation
 
@@ -37,13 +94,11 @@ cd ClawCRM
 # Install dependencies
 npm install
 
-# Push database schema
-npm run db:push
+# Set up the database
+npm run db:migrate
+npm run db:seed  # Optional: adds demo data
 
-# Seed with sample data (optional)
-npm run db:seed
-
-# Start development server
+# Start the dev server
 npm run dev
 ```
 
@@ -51,88 +106,110 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ### Environment Variables
 
-No environment variables are required! ClawCRM works out of the box with the built-in fallback LLM.
-
-Copy `.env.local.example` to `.env.local` if you want to pre-configure API keys:
+Copy `.env.local.example` to `.env.local` and add your API key:
 
 ```bash
 cp .env.local.example .env.local
 ```
 
-## 🧠 AI Providers
+```env
+# Google Gemini (recommended - free tier available)
+GOOGLE_API_KEY=your-key-here
 
-Configure your preferred AI provider in **Settings**:
+# Or use OpenAI
+OPENAI_API_KEY=sk-...
 
-| Provider | Chat | Embeddings | API Key Required |
-|----------|------|------------|-----------------|
-| **Fallback** (default) | Keyword extraction | TF-IDF vectors | ❌ No |
-| OpenAI | GPT-4o / GPT-4o-mini | text-embedding-3-small | ✅ Yes |
-| Anthropic | Claude Sonnet 4 / Haiku | — | ✅ Yes |
-| Google Gemini | Gemini 2.0 Flash | text-embedding-004 | ✅ Yes |
+# Or Anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+```
 
-The fallback provider works entirely offline using:
-- Regex-based person name extraction
-- TF-IDF keyword analysis for topic extraction
-- Hash-based embedding vectors for semantic search
+> **Note:** ClawCRM works without any API key! It uses local keyword-based matching and embeddings. Add an API key for AI-powered meeting processing, profile generation, and semantic search.
+
+You can also configure the LLM provider through the **Settings** page in the app.
+
+### Database Management
+
+```bash
+# Generate new migration after schema changes
+npm run db:generate
+
+# Run migrations
+npm run db:migrate
+
+# Push schema directly (development)
+npm run db:push
+
+# Seed with demo data
+npm run db:seed
+
+# Full setup (migrate + seed)
+npm run db:setup
+```
 
 ## 📁 Project Structure
 
 ```
-src/
-├── app/
-│   ├── api/              # API routes
-│   │   ├── graph/        # Relationship graph data
-│   │   ├── meetings/     # Meeting processing
-│   │   ├── persons/      # CRUD for contacts
-│   │   ├── search/       # Semantic search
-│   │   └── settings/     # App settings
-│   ├── graph/            # Network visualization page
-│   ├── log/              # Meeting logger page
-│   ├── people/           # Contact list & profiles
-│   ├── settings/         # AI provider config
-│   └── page.tsx          # Dashboard
-├── components/
-│   ├── ui/               # shadcn/ui components
-│   ├── command-menu.tsx   # ⌘K command palette
-│   ├── meeting-card.tsx   # Meeting display card
-│   ├── person-card.tsx    # Contact grid card
-│   ├── search-bar.tsx     # Semantic search bar
-│   ├── sidebar.tsx        # Navigation sidebar
-│   └── theme-toggle.tsx   # Dark/light mode toggle
-└── lib/
-    ├── db/               # Database (Drizzle + SQLite)
-    │   ├── schema.ts     # Database schema
-    │   ├── seed.ts       # Sample data
-    │   └── index.ts      # DB connection
-    └── llm/              # AI layer
-        ├── types.ts      # Provider interfaces
-        ├── openai.ts     # OpenAI (fetch-based)
-        ├── anthropic.ts  # Anthropic (fetch-based)
-        ├── gemini.ts     # Google Gemini (fetch-based)
-        ├── fallback.ts   # Offline keyword extraction
-        ├── provider.ts   # Provider factory
-        └── embeddings.ts # TF-IDF, cosine similarity
+ClawCRM/
+├── data/                    # SQLite database (gitignored)
+├── drizzle/                 # Database migrations
+├── src/
+│   ├── app/
+│   │   ├── api/            # API routes
+│   │   │   ├── graph/      # Relationship graph data
+│   │   │   ├── meetings/   # Meeting CRUD & processing
+│   │   │   ├── people/     # People CRUD
+│   │   │   ├── search/     # Semantic search
+│   │   │   ├── settings/   # LLM settings & test
+│   │   │   └── stats/      # Dashboard statistics
+│   │   ├── graph/          # Relationship graph page
+│   │   ├── log/            # Meeting logger page
+│   │   ├── people/         # People list & profile pages
+│   │   ├── settings/       # Settings page
+│   │   ├── layout.tsx      # Root layout
+│   │   └── page.tsx        # Dashboard
+│   ├── components/
+│   │   ├── ui/             # shadcn/ui components
+│   │   ├── command-menu.tsx # ⌘K command palette
+│   │   ├── sidebar.tsx     # Navigation sidebar
+│   │   └── theme-toggle.tsx # Dark/light mode toggle
+│   └── lib/
+│       ├── db/
+│       │   ├── schema.ts   # Drizzle ORM schema
+│       │   ├── index.ts    # Database connection
+│       │   ├── migrate.ts  # Migration runner
+│       │   └── seed.ts     # Seed data
+│       └── llm/
+│           ├── types.ts    # LLM/embedding interfaces
+│           ├── provider.ts # Provider factory
+│           ├── gemini.ts   # Google Gemini provider
+│           ├── openai.ts   # OpenAI provider
+│           ├── anthropic.ts # Anthropic provider
+│           ├── fallback.ts # Local fallback provider
+│           └── embeddings.ts # Embedding utilities
+├── drizzle.config.ts       # Drizzle ORM config
+└── package.json
 ```
 
-## 🛠️ Tech Stack
+## 🔒 Privacy & Self-Hosting
 
-- **Framework:** Next.js 16 (App Router, Turbopack)
-- **UI:** shadcn/ui + Tailwind CSS v4
-- **Database:** SQLite via better-sqlite3 + Drizzle ORM
-- **Graph:** react-force-graph-2d
-- **AI:** Pure fetch-based providers (no SDK dependencies)
-- **Voice:** Web Speech API
+- **All data stays on your machine** — SQLite database stored locally
+- **No telemetry** — no data sent anywhere except your configured LLM provider
+- **Works offline** — local fallback for search and matching (no AI features)
+- **Your API keys are stored locally** in the SQLite database
 
-## 📜 Scripts
+## 📝 Data Model
 
-```bash
-npm run dev        # Start dev server
-npm run build      # Production build
-npm run start      # Start production server
-npm run db:push    # Push schema to database
-npm run db:seed    # Seed with sample data
 ```
+Person { id, name, phone, email, socials, tags[], context, embedding, person_md, avatar_url, company, role }
+Meeting { id, person_id, date, raw_input, summary, topics[], embedding }
+Relationship { id, person_a_id, person_b_id, context, strength }
+Settings { id, key, value }
+```
+
+## 🤝 Contributing
+
+Contributions welcome! Feel free to open issues or submit PRs.
 
 ## 📄 License
 
-MIT
+MIT License — do whatever you want with it.
