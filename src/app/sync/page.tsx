@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import {
   Upload,
@@ -16,6 +16,12 @@ import {
   RefreshCw,
   X,
   Eye,
+  Wifi,
+  WifiOff,
+  QrCode,
+  LogOut,
+  Power,
+  Smartphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -60,10 +66,258 @@ interface SyncLogEntry {
   details: string | null;
 }
 
-type Tab = "import" | "history";
+interface WAClientStatus {
+  status: "disconnected" | "qr_pending" | "connecting" | "ready" | "error";
+  qrCode: string | null;
+  connectedNumber: string | null;
+  connectedName: string | null;
+  error: string | null;
+  messagesSynced: number;
+}
 
+type Tab = "live" | "import" | "history";
+
+// ─── Live Sync Section ───────────────────────────────────────
+function LiveSyncSection() {
+  const [clientStatus, setClientStatus] = useState<WAClientStatus | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [contactSyncResult, setContactSyncResult] = useState<{
+    synced: number;
+    created: number;
+    errors: string[];
+  } | null>(null);
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/sync/whatsapp/client");
+      const data: WAClientStatus = await res.json();
+      setClientStatus(data);
+    } catch {
+      // Ignore fetch errors during polling
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 3000);
+    return () => clearInterval(interval);
+  }, [fetchStatus]);
+
+  async function doAction(action: string) {
+    setActionLoading(action);
+    setContactSyncResult(null);
+    try {
+      const res = await fetch("/api/sync/whatsapp/client", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+
+      if (action === "sync-contacts" && data.ok) {
+        setContactSyncResult({ synced: data.synced, created: data.created, errors: data.errors });
+        toast.success(`Synced ${data.synced} contacts (${data.created} new)`);
+      } else if (action === "start") {
+        toast.success("WhatsApp client starting...");
+      } else if (action === "stop") {
+        toast.success("Disconnected");
+      } else if (action === "logout") {
+        toast.success("Logged out");
+      }
+
+      // Refresh status immediately
+      await fetchStatus();
+    } catch {
+      toast.error(`Action "${action}" failed`);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  const status = clientStatus?.status || "disconnected";
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Smartphone className="h-5 w-5" />
+            WhatsApp Connection
+          </CardTitle>
+          <CardDescription>
+            Connect your WhatsApp to automatically sync messages and contacts into the CRM
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Status indicator */}
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-3 h-3 rounded-full ${
+                status === "ready"
+                  ? "bg-green-500 animate-pulse"
+                  : status === "qr_pending" || status === "connecting"
+                  ? "bg-yellow-500 animate-pulse"
+                  : status === "error"
+                  ? "bg-red-500"
+                  : "bg-gray-400"
+              }`}
+            />
+            <span className="text-sm font-medium capitalize">
+              {status === "qr_pending" ? "Waiting for QR scan" : status.replace("_", " ")}
+            </span>
+            {clientStatus?.connectedName && (
+              <Badge variant="secondary">
+                {clientStatus.connectedName} ({clientStatus.connectedNumber})
+              </Badge>
+            )}
+            {clientStatus?.messagesSynced ? (
+              <Badge variant="outline" className="ml-auto">
+                {clientStatus.messagesSynced} messages synced
+              </Badge>
+            ) : null}
+          </div>
+
+          {/* Error display */}
+          {clientStatus?.error && (
+            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-400">
+              <AlertCircle className="h-4 w-4 inline mr-2" />
+              {clientStatus.error}
+            </div>
+          )}
+
+          {/* QR Code */}
+          {status === "qr_pending" && clientStatus?.qrCode && (
+            <div className="flex flex-col items-center gap-3 py-4">
+              <p className="text-sm text-muted-foreground text-center">
+                Scan this QR code with WhatsApp on your phone
+              </p>
+              <div className="bg-white p-4 rounded-lg">
+                <img
+                  src={clientStatus.qrCode}
+                  alt="WhatsApp QR Code"
+                  className="w-64 h-64"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Open WhatsApp → Settings → Linked Devices → Link a Device
+              </p>
+            </div>
+          )}
+
+          {/* Connecting spinner */}
+          {status === "connecting" && !clientStatus?.qrCode && (
+            <div className="flex items-center justify-center gap-2 py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Starting WhatsApp client...</span>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex flex-wrap gap-2">
+            {(status === "disconnected" || status === "error") && (
+              <Button
+                onClick={() => doAction("start")}
+                disabled={actionLoading !== null}
+                className="gap-2"
+              >
+                {actionLoading === "start" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Wifi className="h-4 w-4" />
+                )}
+                Connect WhatsApp
+              </Button>
+            )}
+
+            {status === "ready" && (
+              <>
+                <Button
+                  onClick={() => doAction("sync-contacts")}
+                  disabled={actionLoading !== null}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  {actionLoading === "sync-contacts" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Users className="h-4 w-4" />
+                  )}
+                  Sync All Contacts
+                </Button>
+
+                <Button
+                  onClick={() => doAction("stop")}
+                  disabled={actionLoading !== null}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  {actionLoading === "stop" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <WifiOff className="h-4 w-4" />
+                  )}
+                  Disconnect
+                </Button>
+
+                <Button
+                  onClick={() => doAction("logout")}
+                  disabled={actionLoading !== null}
+                  variant="ghost"
+                  className="gap-2 text-red-400 hover:text-red-300"
+                >
+                  {actionLoading === "logout" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <LogOut className="h-4 w-4" />
+                  )}
+                  Logout
+                </Button>
+              </>
+            )}
+
+            {(status === "qr_pending" || status === "connecting") && (
+              <Button
+                onClick={() => doAction("stop")}
+                disabled={actionLoading !== null}
+                variant="outline"
+                className="gap-2"
+              >
+                <X className="h-4 w-4" /> Cancel
+              </Button>
+            )}
+          </div>
+
+          {/* Ready info */}
+          {status === "ready" && (
+            <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/30 text-sm">
+              <CheckCircle2 className="h-4 w-4 inline mr-2 text-green-500" />
+              Auto-sync is active. New WhatsApp messages are automatically synced to the CRM.
+            </div>
+          )}
+
+          {/* Contact sync result */}
+          {contactSyncResult && (
+            <div className="p-3 rounded-lg bg-secondary text-sm space-y-1">
+              <p className="font-medium">Contact Sync Complete</p>
+              <p className="text-muted-foreground">
+                {contactSyncResult.synced} contacts synced ({contactSyncResult.created} new)
+              </p>
+              {contactSyncResult.errors.length > 0 && (
+                <p className="text-red-400 text-xs">
+                  {contactSyncResult.errors.length} errors
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Main Page ───────────────────────────────────────────────
 export default function SyncPage() {
-  const [tab, setTab] = useState<Tab>("import");
+  const [tab, setTab] = useState<Tab>("live");
   const [pasteContent, setPasteContent] = useState("");
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
@@ -114,7 +368,6 @@ export default function SyncPage() {
       if (!res.ok) throw new Error("Preview failed");
       const data: PreviewData = await res.json();
       setPreview(data);
-      // Also store the content for later import
       const content = await file.text();
       setPasteContent(content);
       toast.success(`Parsed "${data.chatName}" — ${data.totalMessages} messages`);
@@ -216,6 +469,13 @@ export default function SyncPage() {
       {/* Tabs */}
       <div className="flex gap-2">
         <Button
+          variant={tab === "live" ? "default" : "outline"}
+          onClick={() => setTab("live")}
+          className="gap-2"
+        >
+          <Wifi className="h-4 w-4" /> Live Sync
+        </Button>
+        <Button
           variant={tab === "import" ? "default" : "outline"}
           onClick={() => setTab("import")}
           className="gap-2"
@@ -230,6 +490,9 @@ export default function SyncPage() {
           <Clock className="h-4 w-4" /> History
         </Button>
       </div>
+
+      {/* ===== LIVE SYNC TAB ===== */}
+      {tab === "live" && <LiveSyncSection />}
 
       {/* ===== IMPORT TAB ===== */}
       {tab === "import" && (
