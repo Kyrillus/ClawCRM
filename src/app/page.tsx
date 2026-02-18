@@ -17,6 +17,7 @@ import {
   Clock,
   User,
   ArrowRight,
+  HeartCrack,
 } from "lucide-react";
 
 interface Stats {
@@ -46,6 +47,14 @@ interface MeetingItem {
   personCompany: string | null;
 }
 
+interface StaleContact {
+  id: number;
+  name: string;
+  company: string | null;
+  lastMeetingDate: string;
+  daysSinceContact: number;
+}
+
 interface SearchResultItem {
   id: number;
   name: string;
@@ -61,15 +70,18 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
   const [searching, setSearching] = useState(false);
+  const [staleContacts, setStaleContacts] = useState<StaleContact[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
       fetch("/api/stats").then((r) => r.json()),
       fetch("/api/meetings?limit=5").then((r) => r.json()),
-    ]).then(([statsData, meetingsData]) => {
+      fetch("/api/insights/stale").then((r) => r.json()).catch(() => []),
+    ]).then(([statsData, meetingsData, staleData]) => {
       setStats(statsData);
       setRecentMeetings(meetingsData);
+      setStaleContacts(Array.isArray(staleData) ? staleData : []);
       setLoading(false);
     });
   }, []);
@@ -329,6 +341,40 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Reconnect - Stale Contacts */}
+      {!loading && staleContacts.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <HeartCrack className="w-5 h-5 text-destructive" />
+            <h2 className="text-xl font-semibold">Reconnect</h2>
+          </div>
+          <div className="space-y-3">
+            {staleContacts.slice(0, 5).map((contact) => (
+              <Card key={contact.id} className="hover:bg-secondary/30 transition-colors">
+                <CardContent className="p-4">
+                  <Link href={`/people/${contact.id}`} className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                        <HeartCrack className="w-5 h-5 text-destructive" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{contact.name}</p>
+                        {contact.company && (
+                          <p className="text-sm text-muted-foreground">{contact.company}</p>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-sm text-muted-foreground whitespace-nowrap">
+                      {contact.daysSinceContact} days ago
+                    </span>
+                  </Link>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
