@@ -188,7 +188,7 @@ export class FallbackProvider implements LLMProvider, EmbeddingProvider {
    */
   private extractTopics(text: string): string[] {
     const meetingText = this.getMeetingText(text);
-    const keywords = extractKeywords(meetingText, 15);
+    const keywords = extractKeywords(meetingText, 15).filter((kw) => !isPromptWord(kw));
 
     // Group related keywords into topic phrases
     const topics: string[] = [];
@@ -197,7 +197,7 @@ export class FallbackProvider implements LLMProvider, EmbeddingProvider {
     // Find noun phrases and compound terms
     const bigramFreq: Record<string, number> = {};
     for (let i = 0; i < words.length - 1; i++) {
-      if (!isStopWord(words[i]) && !isStopWord(words[i + 1])) {
+      if (!isStopWord(words[i]) && !isStopWord(words[i + 1]) && !isPromptWord(words[i]) && !isPromptWord(words[i + 1])) {
         const bigram = words[i] + " " + words[i + 1];
         bigramFreq[bigram] = (bigramFreq[bigram] || 0) + 1;
       }
@@ -226,19 +226,41 @@ export class FallbackProvider implements LLMProvider, EmbeddingProvider {
    * Try to extract just the meeting text from a prompt that might contain instructions
    */
   private getMeetingText(prompt: string): string {
-    // Look for common delimiters
+    // Look for common delimiters that separate instructions from content
     const markers = [
-      "meeting note:", "meeting text:", "note:", "text:", "input:",
-      "---", "```", "here is", "here's the",
+      "meeting note:", "meeting text:", "meeting notes:", "note:", "text:", "input:",
+      "---", "```", "here is", "here's the", "transcript:",
+      "content:", "the following",
     ];
     const lower = prompt.toLowerCase();
+
+    // Try markers - pick the last one found to skip past all instructions
+    let bestIdx = -1;
+    let bestMarkerLen = 0;
     for (const marker of markers) {
       const idx = lower.indexOf(marker);
-      if (idx !== -1) {
-        return prompt.slice(idx + marker.length).trim();
+      if (idx !== -1 && idx > bestIdx) {
+        bestIdx = idx;
+        bestMarkerLen = marker.length;
       }
     }
-    return prompt;
+    if (bestIdx !== -1) {
+      const extracted = prompt.slice(bestIdx + bestMarkerLen).replace(/^[\s`\-:]+/, "").trim();
+      if (extracted.length > 20) return extracted;
+    }
+
+    // Strip lines that look like instructions (imperative sentences with JSON/extract/return etc)
+    const lines = prompt.split("\n");
+    const contentLines = lines.filter((line) => {
+      const l = line.toLowerCase().trim();
+      if (l.length === 0) return false;
+      // Skip lines that are clearly instructions
+      if (/^(extract|analyze|parse|return|provide|generate|create|output|identify|list|find)\b/i.test(l)) return false;
+      if (/\bjson\b/.test(l) && /\b(return|format|valid|object|array)\b/.test(l)) return false;
+      return true;
+    });
+
+    return contentLines.join("\n").trim() || prompt;
   }
 
   // --- Person markdown generation ---
@@ -289,6 +311,17 @@ export class FallbackProvider implements LLMProvider, EmbeddingProvider {
   }
 }
 
+const PROMPT_WORDS = new Set([
+  "extract", "analyze", "meeting", "note", "json", "return", "object", "array",
+  "summary", "topics", "names", "person", "keyword", "phrase", "brief",
+  "sentence", "information", "data", "valid", "following", "mentioned",
+  "conversation", "discussed", "include", "distinct", "parse",
+]);
+
+function isPromptWord(word: string): boolean {
+  return PROMPT_WORDS.has(word.toLowerCase());
+}
+
 function isStopWord(word: string): boolean {
   const stops = new Set([
     "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
@@ -296,6 +329,10 @@ function isStopWord(word: string): boolean {
     "have", "has", "had", "do", "does", "did", "will", "would", "could",
     "should", "may", "might", "i", "me", "my", "we", "our", "you", "your",
     "he", "him", "she", "her", "it", "they", "them", "their", "about",
+    "extract", "analyze", "meeting", "note", "json", "return", "object", "array",
+    "summary", "topics", "names", "person", "keyword", "phrase", "brief",
+    "sentence", "information", "data", "valid", "following", "mentioned",
+    "conversation", "discussed", "include", "distinct", "parse",
   ]);
   return stops.has(word.toLowerCase());
 }
