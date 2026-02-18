@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { getEmbedder } from "@/lib/llm/provider";
 import { bufferToEmbedding, cosineSimilarity } from "@/lib/llm/embeddings";
+import { stringSimilarity } from "string-similarity-js";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,12 @@ export async function GET(req: NextRequest) {
       // Boost exact name matches
       if (person.name.toLowerCase().includes(query)) {
         score += 0.5;
+      }
+
+      // Fuzzy name matching
+      const nameSimilarity = stringSimilarity(query, person.name.toLowerCase());
+      if (nameSimilarity > 0.3) {
+        score = Math.max(score, nameSimilarity);
       }
 
       // Semantic similarity if embeddings available
