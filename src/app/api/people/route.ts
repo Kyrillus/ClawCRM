@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
-import { eq, desc, sql } from "drizzle-orm";
+import { desc, sql } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -30,19 +30,28 @@ export async function GET(request: NextRequest) {
   }
 
   const result = allPeople.map((person) => {
-    const lastMeeting = db
-      .select({ date: schema.meetings.date })
-      .from(schema.meetings)
-      .where(eq(schema.meetings.personId, person.id))
-      .orderBy(desc(schema.meetings.date))
-      .limit(1)
-      .get();
+    // Query via both legacy personId and junction table
+    const lastMeeting = db.get<{ date: string }>(sql`
+      SELECT MAX(m.date) as date FROM meetings m
+      WHERE m.id IN (
+        SELECT mid FROM (
+          SELECT meeting_id as mid FROM meeting_people WHERE person_id = ${person.id}
+          UNION
+          SELECT id as mid FROM meetings WHERE person_id = ${person.id}
+        )
+      )
+    `);
 
-    const meetingCount = db
-      .select({ count: sql<number>`count(*)` })
-      .from(schema.meetings)
-      .where(eq(schema.meetings.personId, person.id))
-      .get();
+    const meetingCount = db.get<{ count: number }>(sql`
+      SELECT COUNT(DISTINCT m.id) as count FROM meetings m
+      WHERE m.id IN (
+        SELECT mid FROM (
+          SELECT meeting_id as mid FROM meeting_people WHERE person_id = ${person.id}
+          UNION
+          SELECT id as mid FROM meetings WHERE person_id = ${person.id}
+        )
+      )
+    `);
 
     return {
       ...person,
