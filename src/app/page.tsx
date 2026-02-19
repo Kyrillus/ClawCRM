@@ -353,13 +353,24 @@ export default function Dashboard() {
             <h2 className="text-xl font-semibold">Reconnect</h2>
           </div>
           <div className="space-y-3">
-            {staleContacts.slice(0, 5).map((contact) => (
+            {staleContacts.slice(0, 5).map((contact) => {
+              const decayColor = contact.decayLevel === "lost"
+                ? "bg-destructive/20 text-destructive"
+                : contact.decayLevel === "fading"
+                ? "bg-orange-500/20 text-orange-500"
+                : "bg-yellow-500/20 text-yellow-500";
+              const decayIcon = contact.decayLevel === "lost"
+                ? "bg-destructive/10"
+                : contact.decayLevel === "fading"
+                ? "bg-orange-500/10"
+                : "bg-yellow-500/10";
+              return (
               <Card key={contact.id} className="hover:bg-secondary/30 transition-colors">
                 <CardContent className="p-4">
                   <Link href={`/people/${contact.id}`} className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
-                        <HeartCrack className="w-5 h-5 text-destructive" />
+                      <div className={`w-10 h-10 rounded-full ${decayIcon} flex items-center justify-center`}>
+                        <HeartCrack className={`w-5 h-5 ${contact.decayLevel === "lost" ? "text-destructive" : contact.decayLevel === "fading" ? "text-orange-500" : "text-yellow-500"}`} />
                       </div>
                       <div>
                         <p className="font-medium">{contact.name}</p>
@@ -368,13 +379,19 @@ export default function Dashboard() {
                         )}
                       </div>
                     </div>
-                    <span className="text-sm text-muted-foreground whitespace-nowrap">
-                      {contact.daysSinceContact} days ago
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={`text-xs ${decayColor}`}>
+                        {contact.decayLevel}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground whitespace-nowrap">
+                        {contact.daysSinceContact}d
+                      </span>
+                    </div>
                   </Link>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
