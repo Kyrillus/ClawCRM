@@ -51,8 +51,11 @@ interface StaleContact {
   id: number;
   name: string;
   company: string | null;
+  role: string | null;
   lastMeetingDate: string;
   daysSinceContact: number;
+  meetingCount: number;
+  decayLevel: "warning" | "fading" | "lost";
 }
 
 interface SearchResultItem {
@@ -77,11 +80,11 @@ export default function Dashboard() {
     Promise.all([
       fetch("/api/stats").then((r) => r.json()),
       fetch("/api/meetings?limit=5").then((r) => r.json()),
-      fetch("/api/insights/stale").then((r) => r.json()).catch(() => []),
+      fetch("/api/insights/stale").then((r) => r.json()).catch(() => ({ contacts: [] })),
     ]).then(([statsData, meetingsData, staleData]) => {
       setStats(statsData);
       setRecentMeetings(meetingsData);
-      setStaleContacts(Array.isArray(staleData) ? staleData : []);
+      setStaleContacts(staleData?.contacts || (Array.isArray(staleData) ? staleData : []));
       setLoading(false);
     });
   }, []);
