@@ -28,6 +28,10 @@ import {
   Trash2,
   RefreshCw,
   X,
+  Activity,
+  CalendarDays,
+  TrendingUp,
+  Hash,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -235,16 +239,35 @@ export default function PersonProfile({
         </div>
       </div>
 
-      {/* Tags */}
-      {(person.tags || []).length > 0 && (
-        <div className="flex gap-2 flex-wrap">
-          {person.tags.map((tag) => (
+      {/* Tags & Relationship Strength */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {(person.tags || []).length > 0 &&
+          person.tags.map((tag) => (
             <Badge key={tag} variant="secondary">
               {tag}
             </Badge>
           ))}
-        </div>
-      )}
+        {(() => {
+          const meetings = person.meetings || [];
+          const count = meetings.length;
+          if (count === 0) return null;
+          const lastDate = meetings.reduce((latest, m) =>
+            m.date > latest ? m.date : latest, meetings[0].date);
+          const daysSince = Math.floor((Date.now() - new Date(lastDate).getTime()) / (1000 * 60 * 60 * 24));
+          let label: string, color: string;
+          if (count >= 5 && daysSince <= 14) { label = "Strong"; color = "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"; }
+          else if (count >= 3 && daysSince <= 30) { label = "Good"; color = "bg-blue-500/15 text-blue-400 border-blue-500/30"; }
+          else if (daysSince > 60) { label = "Fading"; color = "bg-red-500/15 text-red-400 border-red-500/30"; }
+          else if (count <= 1) { label = "New"; color = "bg-violet-500/15 text-violet-400 border-violet-500/30"; }
+          else { label = "Moderate"; color = "bg-amber-500/15 text-amber-400 border-amber-500/30"; }
+          return (
+            <Badge className={`gap-1 border ${color}`}>
+              <Activity className="h-3 w-3" />
+              {label}
+            </Badge>
+          );
+        })()}
+      </div>
 
       {/* Edit Form */}
       {editing && (
@@ -313,6 +336,69 @@ export default function PersonProfile({
           </CardContent>
         </Card>
       )}
+
+      {/* Quick Stats */}
+      {person.meetings.length > 0 && (() => {
+        const meetings = person.meetings;
+        const count = meetings.length;
+        const dates = meetings.map(m => new Date(m.date)).sort((a, b) => a.getTime() - b.getTime());
+        const firstMet = dates[0];
+        const monthsSpan = Math.max(1, (Date.now() - firstMet.getTime()) / (1000 * 60 * 60 * 24 * 30));
+        const avgPerMonth = (count / monthsSpan).toFixed(1);
+        const topicCounts: Record<string, number> = {};
+        meetings.forEach(m => (m.topics || []).forEach(t => { topicCounts[t] = (topicCounts[t] || 0) + 1; }));
+        const topTopics = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+        return (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" /> Quick Stats
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div className="text-center p-3 rounded-lg bg-muted/50">
+                  <div className="text-2xl font-bold">{count}</div>
+                  <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                    <CalendarDays className="h-3 w-3" /> Total Meetings
+                  </div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-muted/50">
+                  <div className="text-2xl font-bold">{firstMet.toLocaleDateString("en-US", { month: "short", year: "numeric" })}</div>
+                  <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                    <Clock className="h-3 w-3" /> First Met
+                  </div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-muted/50">
+                  <div className="text-2xl font-bold">{avgPerMonth}</div>
+                  <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                    <TrendingUp className="h-3 w-3" /> Per Month
+                  </div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-muted/50">
+                  <div className="text-2xl font-bold">{Object.keys(topicCounts).length}</div>
+                  <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                    <Hash className="h-3 w-3" /> Topics
+                  </div>
+                </div>
+              </div>
+              {topTopics.length > 0 && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Most discussed</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {topTopics.map(([topic, cnt]) => (
+                      <Badge key={topic} variant="outline" className="text-xs">
+                        {topic} ({cnt})
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Tabs */}
       <Tabs defaultValue="profile" className="w-full">
