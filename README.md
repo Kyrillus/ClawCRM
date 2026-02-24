@@ -1,4 +1,4 @@
-# 🐾 ClawCRM
+# ClawCRM
 
 **AI-Powered Personal People CRM**
 
